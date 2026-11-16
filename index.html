@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gold per Gram | USD, INR, SGD price history</title>
+<meta name="description" content="Interactive gold price history per gram in US dollars, Indian rupees and Singapore dollars, from 1970 to today.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23d9a520'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23f6d365'/%3E%3C/svg%3E">
+<style>
+/* Layout: one-screen dashboard on desktop (tiles, then chart beside a tool rail); stacked on phones. */
+:root{
+  --bg:#f5f5f7; --card:#ffffff; --ink:#1d1d1f; --ink2:#48484d; --muted:#76767c;
+  --line:rgba(0,0,0,.09); --grid:#eeeef1; --track:#e8e8ed; --thumb:#ffffff;
+  --up:#1a7f37; --down:#c62828; --focus:#0071e3;
+  --usd:#2a78d6; --inr:#eb6834; --sgd:#1baf7a;
+  --gold-a:#f6d365; --gold-b:#c8962a;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 8px 28px rgba(0,0,0,.06);
+  --radius:18px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#000000; --card:#1c1c1e; --ink:#f5f5f7; --ink2:#c7c7cc; --muted:#98989f;
+  --line:rgba(255,255,255,.12); --grid:#2a2a2d; --track:#2c2c2e; --thumb:#636366;
+  --up:#30d158; --down:#ff6961; --focus:#409cff;
+  --usd:#3987e5; --inr:#d95926; --sgd:#199e70;
+  --shadow:0 1px 2px rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.4 var(--font);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+[hidden]{display:none!important}
+
+.app{height:100dvh;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;gap:12px;
+  padding-block:14px 10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  max-width:1680px;margin:0 auto}
+
+/* header */
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto;min-width:0}
+.coin{width:30px;height:30px;border-radius:50%;flex:none;background:radial-gradient(circle at 32% 28%,var(--gold-a),var(--gold-b) 72%);box-shadow:inset 0 0 0 2px rgba(255,255,255,.35),0 2px 6px rgba(200,150,42,.35)}
+.brand h1{font-size:19px;line-height:1.15;margin:0;letter-spacing:-.02em;font-weight:700}
+.brand p{margin:0;color:var(--muted);font-size:12px}
+.ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.field{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
+select,input[type="date"],input[type="number"]{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 8px;min-height:34px;color:var(--ink)}
+.iconbtn{background:var(--card);border:1px solid var(--line);border-radius:10px;min-height:34px;padding:0 11px;color:var(--ink2);font-weight:500}
+.iconbtn:hover{color:var(--ink)}
+
+/* tiles */
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tile{background:var(--card);border:1px solid transparent;border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 16px;text-align:left;display:grid;gap:2px;min-width:0;transition:transform .12s ease}
+.tile:active{transform:scale(.985)}
+.tile[aria-pressed="true"]{border-color:var(--ink);box-shadow:var(--shadow),inset 0 0 0 1px var(--ink)}
+.tile .who{display:flex;align-items:center;gap:7px;color:var(--ink2);font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden}
+.tile .who span{color:var(--muted);font-weight:400;overflow:hidden;text-overflow:ellipsis}
+.dot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--c)}
+.tile .px{font-size:clamp(17px,2.5vw,30px);font-weight:700;letter-spacing:-.025em;line-height:1.15;white-space:nowrap}
+.tile .px.long{font-size:clamp(13px,1.9vw,24px)}
+.tile .px small{font-size:12px;font-weight:500;color:var(--muted);letter-spacing:0}
+.tile .chg{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.up{color:var(--up)} .down{color:var(--down)}
+
+/* main */
+.main{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px;min-height:0}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow)}
+.chartcard{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.chartcard.is-max{position:fixed;inset:0;z-index:50;border-radius:0;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.bar{display:flex;align-items:center;gap:8px;padding:10px 12px 0;flex-wrap:wrap}
+.bar.tools{padding-bottom:8px;border-bottom:1px solid var(--line)}
+.scroller{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;min-width:0;flex:0 1 auto;padding:2px}
+.scroller::-webkit-scrollbar{display:none}
+.tools .scroller{flex-wrap:wrap;overflow:visible}
+.seg{display:inline-flex;background:var(--track);border-radius:10px;padding:2px;flex:none}
+.seg button{border:0;background:none;border-radius:8px;padding:5px 10px;min-height:30px;color:var(--ink2);font-weight:500;white-space:nowrap;font-variant-numeric:tabular-nums}
+.seg button[aria-pressed="true"]{background:var(--thumb);color:var(--ink);font-weight:650;box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:4px 12px;min-height:30px;color:var(--ink2);font-weight:500;white-space:nowrap;flex:none}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--card)}
+.chip:disabled{opacity:.4;cursor:not-allowed}
+.spacer{flex:1 1 0}
+.dates{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;flex:none}
+.dates input{min-height:30px;padding:3px 6px;font-size:12px}
+.plot{position:relative;flex:1 1 auto;min-height:260px}
+#chart{position:absolute;inset:0}
+#legend{position:absolute;top:8px;left:12px;right:70px;z-index:3;pointer-events:none;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;font-variant-numeric:tabular-nums}
+#legend .lg{display:inline-flex;align-items:baseline;gap:6px;background:color-mix(in srgb,var(--card) 82%,transparent);border-radius:8px;padding:1px 6px;white-space:nowrap}
+#legend .lg .dot{align-self:center}
+#legend b{font-size:16px;letter-spacing:-.01em}
+#legend .when,#legend .sub{color:var(--muted);font-size:12px}
+#legend .dash{display:inline-block;width:16px;border-top:2px dashed var(--ink2);align-self:center}
+#legend .dash.solid{border-top:2px solid var(--muted)}
+#tableWrap{position:absolute;inset:0;overflow:auto;padding:0 12px 12px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+thead th{position:sticky;top:0;background:var(--card);color:var(--muted);font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:600;z-index:1}
+td.note{color:var(--muted);font-size:12px}
+
+/* side rail */
+.side{display:flex;flex-direction:column;gap:12px;min-height:0;overflow-y:auto;scrollbar-width:thin}
+.panel{padding:14px 16px}
+.panel h2{margin:0 0 2px;font-size:13px;font-weight:650;letter-spacing:-.005em}
+.panel .cap{margin:0 0 10px;color:var(--muted);font-size:12px}
+dl.kv{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;margin:0;font-variant-numeric:tabular-nums}
+dl.kv dt{color:var(--muted)}
+dl.kv dd{margin:0;text-align:right;font-weight:600;min-width:0}
+dl.kv dd small{display:block;font-weight:400;color:var(--muted);font-size:11px}
+.rows{display:grid;gap:8px;font-variant-numeric:tabular-nums}
+.row{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;align-items:center}
+.row .nm{display:flex;align-items:center;gap:7px;color:var(--ink2);font-weight:600}
+.row .val{text-align:right;font-weight:650}
+.row .sub{grid-column:1/-1;text-align:right;color:var(--muted);font-size:11px}
+.calc{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.calc label{display:grid;gap:3px;color:var(--muted);font-size:11px;min-width:0}
+.calc input,.calc select{width:100%;min-width:0}
+.calc .wide{grid-column:1/-1}
+.hint{color:var(--muted);font-size:12px;margin:0}
+
+footer{color:var(--muted);font-size:11px;display:flex;gap:6px 14px;flex-wrap:wrap}
+footer a{color:inherit}
+
+@media (max-width:1020px),(max-height:620px){
+  .app{height:auto;min-height:100dvh;grid-template-rows:auto}
+  .main{grid-template-columns:minmax(0,1fr)}
+  .plot{flex:none;height:clamp(320px,60vh,620px)}
+  .chartcard.is-max .plot{flex:1 1 auto;height:auto}
+  .side{overflow:visible;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+}
+@media (max-width:560px){
+  .app{gap:10px;padding-block:10px}
+  .tiles{gap:8px}
+  .tile{padding:10px 10px;border-radius:14px}
+  .tile .who span{display:none}
+  .tile .chg{gap:2px 8px;font-size:11px}
+  .brand h1{font-size:17px}
+  .bar{padding:8px 8px 0}
+  .bar.tools{padding-bottom:8px}
+  .tools .scroller{flex-wrap:nowrap;overflow-x:auto}
+  .seg button{padding:5px 9px;min-height:34px}
+  .chip{min-height:34px}
+  #legend{left:8px;right:74px}
+  .scroller{padding-right:28px;-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent)}
+  #legend b{font-size:15px}
+  th,td{padding:7px 6px;font-size:12px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="coin" aria-hidden="true"></div>
+      <div>
+        <h1>Gold per Gram</h1>
+        <p id="updated">Loading prices…</p>
+      </div>
+    </div>
+    <div class="ctl">
+      <label class="field">Unit
+        <select id="unit" aria-label="Weight unit">
+          <option value="g">1 gram</option>
+          <option value="g10">10 grams</option>
+          <option value="tola">1 tola</option>
+          <option value="oz">1 troy oz</option>
+          <option value="kg">1 kg</option>
+        </select>
+      </label>
+      <label class="field">Purity
+        <select id="purity" aria-label="Gold purity">
+          <option value="k24">24K</option>
+          <option value="k22">22K</option>
+          <option value="k18">18K</option>
+        </select>
+      </label>
+      <button class="iconbtn" id="themeBtn" type="button">Dark</button>
+    </div>
+  </header>
+
+  <section class="tiles" id="tiles" aria-label="Latest gold price by currency"></section>
+
+  <main class="main">
+    <section class="card chartcard" id="chartCard" aria-label="Gold price chart">
+      <div class="bar">
+        <div class="scroller"><div class="seg" id="ranges" role="group" aria-label="Time range"></div></div>
+        <div class="dates">
+          <input type="date" id="dFrom" aria-label="From date">
+          <span>to</span>
+          <input type="date" id="dTo" aria-label="To date">
+        </div>
+        <div class="spacer"></div>
+        <div class="seg" id="views" role="group" aria-label="View">
+          <button type="button" data-view="chart" aria-pressed="true">Chart</button>
+          <button type="button" data-view="table" aria-pressed="false">Table</button>
+        </div>
+      </div>
+      <div class="bar tools" id="tools">
+        <div class="scroller">
+          <div class="seg" id="intervals" role="group" aria-label="Interval">
+            <button type="button" data-iv="D" title="Daily closes, from 2000">Day</button>
+            <button type="button" data-iv="W" title="Weekly closes, from 2000">Week</button>
+            <button type="button" data-iv="M" title="Monthly, from 1970">Month</button>
+          </div>
+          <button class="chip" type="button" id="tCompare" aria-pressed="false" title="Show all three currencies as % change from the left edge of the view">Compare all</button>
+          <button class="chip" type="button" id="tLog" aria-pressed="false" title="Logarithmic price scale">Log scale</button>
+          <button class="chip" type="button" id="tMa50" aria-pressed="false" title="50-period moving average">MA 50</button>
+          <button class="chip" type="button" id="tMa200" aria-pressed="false" title="200-period moving average">MA 200</button>
+          <button class="chip" type="button" id="tHiLo" aria-pressed="false" title="Mark the highest and lowest price in view">High / Low</button>
+          <button class="chip" type="button" id="tMeasure" aria-pressed="false" title="Tap two points on the chart to measure the change between them">Measure</button>
+          <button class="chip" type="button" id="bPng" title="Save the chart as an image">Save PNG</button>
+          <button class="chip" type="button" id="bCsv" title="Download the data as a spreadsheet file">Download CSV</button>
+          <button class="chip" type="button" id="bMax" aria-pressed="false" title="Fill the screen with the chart">Expand</button>
+        </div>
+      </div>
+      <div class="plot">
+        <div id="legend" aria-live="off"></div>
+        <div id="chart"></div>
+        <div id="tableWrap" hidden></div>
+      </div>
+    </section>
+
+    <aside class="side" aria-label="Tools">
+      <section class="card panel" id="statsPanel">
+        <h2>In view</h2>
+        <p class="cap" id="statsCap"></p>
+        <div id="statsBody"></div>
+      </section>
+      <section class="card panel" id="measurePanel" hidden>
+        <h2>Measure</h2>
+        <div id="measureBody"><p class="hint">Tap a start point on the chart, then an end point.</p></div>
+      </section>
+      <section class="card panel">
+        <h2>Gold value calculator</h2>
+        <p class="cap">What a piece of gold is worth at the latest price.</p>
+        <div class="calc">
+          <label>Weight<input type="number" id="cWeight" min="0" step="any" value="10" inputmode="decimal"></label>
+          <label>Unit
+            <select id="cUnit">
+              <option value="g">grams</option>
+              <option value="tola">tola</option>
+              <option value="oz">troy oz</option>
+              <option value="kg">kg</option>
+            </select>
+          </label>
+          <label>Purity
+            <select id="cPurity">
+              <option value="k24">24K</option>
+              <option value="k22">22K</option>
+              <option value="k18">18K</option>
+            </select>
+          </label>
+          <label>Bought on (optional)<input type="date" id="cDate"></label>
+        </div>
+        <div class="rows" id="calcOut"></div>
+      </section>
+      <section class="card panel" id="recordPanel">
+        <h2>Records</h2>
+        <div id="recordBody"></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer>
+    <span>International gold price converted at market exchange rates. Local retail prices add duty, tax and making charges.</span>
+    <span>Daily: COMEX gold futures close (Yahoo Finance). Before Sep 2000: monthly averages (World Bank, FRED).</span>
+    <span>Charts by <a href="https://www.tradingview.com/" target="_blank" rel="noopener">TradingView Lightweight Charts</a>. Not financial advice.</span>
+  </footer>
+</div>
+
+<script src="vendor/lightweight-charts.js"></script>
+<script src="data.js"></script>
+<script>
+(() => {
+'use strict';
+const LW = window.LightweightCharts;
+const $ = s => document.querySelector(s);
+const OZ = 31.1034768;
+const KEYS = ['usd', 'inr', 'sgd'];
+const CUR = {
+  usd: { code: 'USD', name: 'US dollar', locale: 'en-US', sym: '$' },
+  inr: { code: 'INR', name: 'Indian rupee', locale: 'en-IN', sym: '₹' },
+  sgd: { code: 'SGD', name: 'Singapore dollar', locale: 'en-SG', sym: 'S$' }
+};
+const UNITS = {
+  g: { label: 'gram', grams: 1 }, g10: { label: '10 g', grams: 10 }, tola: { label: 'tola', grams: 11.6638038 },
+  oz: { label: 'troy oz', grams: OZ }, kg: { label: 'kg', grams: 1000 }
+};
+const PURITY = { k24: { label: '24K', f: 1 }, k22: { label: '22K', f: 22 / 24 }, k18: { label: '18K', f: 18 / 24 } };
+const RANGES = { '1M': 1, '3M': 3, '6M': 6, 'YTD': 'ytd', '1Y': 12, '5Y': 60, '10Y': 120, '20Y': 240, 'MAX': 'max' };
+const YEAR = 31557600;
+
+const state = {
+  cur: 'usd', unit: 'g', purity: 'k24', interval: 'D', range: '1Y', viewFrom: 0, viewTo: 0,
+  compare: false, log: false, ma50: false, ma200: false, hilo: false, measure: false, view: 'chart', theme: 'light'
+};
+try {
+  const saved = JSON.parse(localStorage.getItem('goldgram') || '{}');
+  if (CUR[saved.cur]) state.cur = saved.cur;
+  if (UNITS[saved.unit]) state.unit = saved.unit;
+  if (PURITY[saved.purity]) state.purity = saved.purity;
+  if (saved.theme === 'dark') state.theme = 'dark';
+} catch (e) {}
+function save() {
+  try { localStorage.setItem('goldgram', JSON.stringify({ cur: state.cur, unit: state.unit, purity: state.purity, theme: state.theme })); } catch (e) {}
+}
+
+/* ---------- formatting ---------- */
+function fmt(cur, v) {
+  if (v == null || !isFinite(v)) return '–';
+  const d = Math.abs(v) >= 10000 ? 0 : 2;
+  return CUR[cur].sym + v.toLocaleString(CUR[cur].locale, { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+function pct(r, digits) {
+  if (r == null || !isFinite(r)) return '–';
+  const p = r * 100, a = Math.abs(p);
+  return (p >= 0 ? '+' : '−') + a.toFixed(digits != null ? digits : a >= 100 ? 0 : a >= 10 ? 1 : 2) + '%';
+}
+function arrowPct(r, digits) {
+  if (r == null || !isFinite(r)) return '–';
+  return `<span class="${r >= 0 ? 'up' : 'down'}">${r >= 0 ? '▲' : '▼'} ${pct(r, digits)}</span>`;
+}
+const dFull = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+const dMonth = new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+function fmtDate(t) { return t < dailyStart ? dMonth.format(t * 1000) + ' avg' : dFull.format(t * 1000); }
+function iso(t) { return new Date(t * 1000).toISOString().slice(0, 10); }
+function span(a, b) {
+  const y = (b - a) / YEAR;
+  if (y >= 0.98) return y.toFixed(1).replace('.0', '') + (y < 1.05 ? ' year' : ' years');
+  const d = Math.round((b - a) / 86400);
+  return d >= 60 ? Math.round(d / 30.44) + ' months' : d + ' days';
+}
+function cssv(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function alpha(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+function lowerBound(arr, x) { let lo = 0, hi = arr.length; while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m] < x) lo = m + 1; else hi = m; } return lo; }
+function mult() { return UNITS[state.unit].grams * PURITY[state.purity].f; }
+function unitLabel() { return 'per ' + UNITS[state.unit].label + ' · ' + PURITY[state.purity].label; }
+
+/* ---------- data ---------- */
+let raw = window.GOLD_DATA, base = {}, dailyStart = 0;
+function ingest() {
+  const d = raw.daily, m = raw.monthly;
+  const D = { t: d.t.map(x => x * 86400), usd: d.usd, inr: d.inr, sgd: d.sgd };
+  dailyStart = D.t[0];
+  const W = { t: [], usd: [], inr: [], sgd: [] };
+  const M = { t: [], usd: [], inr: [], sgd: [] };
+  let [y, mo] = m.start.split('-').map(Number);
+  for (let i = 0; i < m.usd.length; i++) {
+    M.t.push(Date.UTC(y, mo - 1, 15) / 1000);
+    for (const c of KEYS) M[c].push(m[c][i]);
+    if (++mo > 12) { mo = 1; y++; }
+  }
+  const firstDailyMonth = y * 12 + mo - 1;
+  let lastW = null, lastM = null;
+  for (let i = 0; i < d.t.length; i++) {
+    const w = Math.floor((d.t[i] + 3) / 7);
+    if (w === lastW) { const k = W.t.length - 1; W.t[k] = D.t[i]; for (const c of KEYS) W[c][k] = D[c][i]; }
+    else { W.t.push(D.t[i]); for (const c of KEYS) W[c].push(D[c][i]); lastW = w; }
+    const dt = new Date(D.t[i] * 1000), mk = dt.getUTCFullYear() * 12 + dt.getUTCMonth();
+    if (mk < firstDailyMonth) continue;
+    if (mk === lastM) { const k = M.t.length - 1; M.t[k] = D.t[i]; for (const c of KEYS) M[c][k] = D[c][i]; }
+    else { M.t.push(D.t[i]); for (const c of KEYS) M[c].push(D[c][i]); lastM = mk; }
+  }
+  base = { D, W, M };
+}
+
+/* ---------- chart ---------- */
+const chartEl = $('#chart');
+const chart = LW.createChart(chartEl, {
+  autoSize: true,
+  layout: { attributionLogo: false, fontFamily: cssv('--font'), fontSize: 11 },
+  rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.16, bottom: 0.06 } },
+  timeScale: { borderVisible: false, fixLeftEdge: true, fixRightEdge: true, rightOffset: 0, minBarSpacing: 0.01, lockVisibleTimeRangeOnResize: true },
+  crosshair: { mode: LW.CrosshairMode.Magnet },
+  handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+  handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true },
+  localization: { locale: 'en-GB' }
+});
+let allSeries = [], seriesMap = {}, main = null, curT = [], curV = [], ma = {}, viewI = [0, 0], progI = [-1, -1];
+let rendering = false, hiLine = null, loLine = null, measurePts = [], hoverIdx = null;
+
+function themeChart() {
+  const ink2 = cssv('--ink2');
+  chart.applyOptions({
+    layout: { background: { type: 'solid', color: cssv('--card') }, textColor: cssv('--muted') },
+    grid: { vertLines: { color: 'transparent' }, horzLines: { color: cssv('--grid') } },
+    crosshair: {
+      vertLine: { color: alpha(ink2.length === 7 ? ink2 : '#888888', 0.5), labelBackgroundColor: cssv('--ink2') },
+      horzLine: { color: alpha(ink2.length === 7 ? ink2 : '#888888', 0.5), labelBackgroundColor: cssv('--ink2') }
+    }
+  });
+}
+
+function sma(vals, n) {
+  const out = new Array(vals.length).fill(null);
+  let sum = 0;
+  for (let i = 0; i < vals.length; i++) {
+    sum += vals[i];
+    if (i >= n) sum -= vals[i - n];
+    if (i >= n - 1) out[i] = sum / n;
+  }
+  return out;
+}
+
+function presetRange(key) {
+  const last = base.D.t[base.D.t.length - 1], r = RANGES[key];
+  if (r === 'max') return [base.M.t[0], last];
+  const d = new Date(last * 1000);
+  if (r === 'ytd') return [Date.UTC(d.getUTCFullYear(), 0, 1) / 1000, last];
+  d.setUTCMonth(d.getUTCMonth() - r);
+  return [d.getTime() / 1000, last];
+}
+function autoInterval(from, to) {
+  if (from < dailyStart) return 'M';
+  return (to - from) / YEAR <= 5.1 ? 'D' : 'W';
+}
+
+function render() {
+  rendering = true;
+  for (const s of allSeries) chart.removeSeries(s);
+  allSeries = []; seriesMap = {}; ma = {}; hiLine = loLine = null; measurePts = []; hoverIdx = null;
+  const b = base[state.interval], k = mult();
+  const fmtFor = c => ({ type: 'custom', minMove: 0.01, formatter: v => fmt(c, v) });
+
+  if (state.compare) {
+    let s0 = 0;
+    while (s0 < b.t.length && KEYS.some(c => b[c][s0] == null)) s0++;
+    curT = b.t.slice(s0);
+    for (const c of KEYS) {
+      const vals = b[c].slice(s0).map(v => v * k);
+      const s = chart.addLineSeries({ color: cssv('--' + c), lineWidth: 2, title: CUR[c].code, priceLineVisible: false, crosshairMarkerRadius: 4, priceFormat: fmtFor(c) });
+      s.setData(vals.map((v, i) => ({ time: curT[i], value: v })));
+      seriesMap[c] = { s, v: vals };
+      allSeries.push(s);
+    }
+    main = seriesMap[state.cur].s; curV = seriesMap[state.cur].v;
+  } else {
+    const c = state.cur, col = cssv('--' + c);
+    curT = []; curV = [];
+    for (let i = 0; i < b.t.length; i++) if (b[c][i] != null) { curT.push(b.t[i]); curV.push(b[c][i] * k); }
+    main = chart.addAreaSeries({ lineColor: col, topColor: alpha(col, 0.24), bottomColor: alpha(col, 0), lineWidth: 2, priceLineVisible: false, crosshairMarkerRadius: 4.5, priceFormat: fmtFor(c) });
+    main.setData(curV.map((v, i) => ({ time: curT[i], value: v })));
+    seriesMap[c] = { s: main, v: curV };
+    allSeries.push(main);
+    const addMa = (n, opts) => {
+      const vals = sma(curV, n), data = [];
+      for (let i = 0; i < vals.length; i++) if (vals[i] != null) data.push({ time: curT[i], value: vals[i] });
+      const s = chart.addLineSeries(Object.assign({ lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceFormat: fmtFor(c) }, opts));
+      s.setData(data); allSeries.push(s); ma[n] = vals;
+    };
+    if (state.ma50) addMa(50, { color: cssv('--ink2'), lineStyle: LW.LineStyle.Dashed });
+    if (state.ma200) addMa(200, { color: cssv('--muted'), lineWidth: 2 });
+  }
+  chart.priceScale('right').applyOptions({ mode: state.compare ? LW.PriceScaleMode.Percentage : state.log ? LW.PriceScaleMode.Logarithmic : LW.PriceScaleMode.Normal });
+  const [from, to] = state.range ? presetRange(state.range) : [state.viewFrom, state.viewTo];
+  applyTimeRange(from, to);
+  rendering = false;
+  onView({ from: progI[0], to: progI[1] });
+  renderMeasure();
+  syncControls();
+}
+
+function applyTimeRange(from, to) {
+  let i1 = Math.min(curT.length - 1, lowerBound(curT, to + 1) - 1);
+  if (i1 < 1) i1 = Math.min(1, curT.length - 1);
+  let i0 = Math.min(lowerBound(curT, from), i1 - 1);
+  if (i0 < 0) i0 = 0;
+  progI = [i0, i1];
+  chart.timeScale().setVisibleLogicalRange({ from: i0 - 0.45, to: i1 });
+}
+
+let viewQueued = null;
+chart.timeScale().subscribeVisibleLogicalRangeChange(r => {
+  if (!r || rendering) return;
+  viewQueued = r;
+  requestAnimationFrame(() => { if (viewQueued) { const q = viewQueued; viewQueued = null; if (!rendering) onView(q); } });
+});
+
+function onView(r) {
+  const i0 = Math.max(0, Math.round(r.from)), i1 = Math.min(curT.length - 1, Math.round(r.to));
+  if (i1 <= i0) return;
+  if (state.range && (i0 !== progI[0] || i1 !== progI[1])) { state.range = null; syncControls(); }
+  viewI = [i0, i1];
+  state.viewFrom = curT[i0]; state.viewTo = curT[i1];
+  $('#dFrom').value = iso(curT[i0]); $('#dTo').value = iso(curT[i1]);
+  updateStats(); updateLegend();
+}
+
+/* ---------- readouts ---------- */
+function viewStats(vals) {
+  const [i0, i1] = viewI;
+  let hi = i0, lo = i0, sum = 0;
+  for (let i = i0; i <= i1; i++) { const v = vals[i]; if (v > vals[hi]) hi = i; if (v < vals[lo]) lo = i; sum += v; }
+  const first = vals[i0], last = vals[i1], yrs = (curT[i1] - curT[i0]) / YEAR;
+  return { first, last, hi, lo, avg: sum / (i1 - i0 + 1), chg: last / first - 1, yrs, cagr: yrs >= 0.98 ? Math.pow(last / first, 1 / yrs) - 1 : null };
+}
+
+function updateStats() {
+  const [i0, i1] = viewI;
+  $('#statsCap').textContent = `${fmtDate(curT[i0])} to ${fmtDate(curT[i1])} · ${span(curT[i0], curT[i1])}`;
+  if (hiLine) { main.removePriceLine(hiLine); hiLine = null; }
+  if (loLine) { main.removePriceLine(loLine); loLine = null; }
+  if (state.compare) {
+    $('#statsBody').innerHTML = '<div class="rows">' + KEYS.map(c => {
+      const s = viewStats(seriesMap[c].v);
+      return `<div class="row"><span class="nm"><i class="dot" style="--c:var(--${c})"></i>${CUR[c].code}</span><span class="val">${arrowPct(s.chg)}</span>
+        <span class="sub">${fmt(c, s.first)} → ${fmt(c, s.last)}${s.cagr != null ? ' · ' + pct(s.cagr, 1) + ' a year' : ''}</span></div>`;
+    }).join('') + '</div>';
+    return;
+  }
+  const c = state.cur, s = viewStats(curV);
+  $('#statsBody').innerHTML = `<dl class="kv">
+    <dt>Change</dt><dd>${arrowPct(s.chg)}<small>${s.last >= s.first ? '+' : '−'}${fmt(c, Math.abs(s.last - s.first))}</small></dd>
+    <dt>High</dt><dd>${fmt(c, curV[s.hi])}<small>${fmtDate(curT[s.hi])}</small></dd>
+    <dt>Low</dt><dd>${fmt(c, curV[s.lo])}<small>${fmtDate(curT[s.lo])}</small></dd>
+    <dt>Average</dt><dd>${fmt(c, s.avg)}</dd>
+    <dt>Growth a year</dt><dd>${s.cagr != null ? pct(s.cagr, 1) : '–'}<small>${s.cagr != null ? 'compounded' : 'needs a year or more in view'}</small></dd>
+  </dl>`;
+  if (state.hilo) {
+    const col = cssv('--muted');
+    hiLine = main.createPriceLine({ price: curV[s.hi], color: col, lineWidth: 1, lineStyle: LW.LineStyle.Dashed, axisLabelVisible: true, title: 'High' });
+    loLine = main.createPriceLine({ price: curV[s.lo], color: col, lineWidth: 1, lineStyle: LW.LineStyle.Dashed, axisLabelVisible: true, title: 'Low' });
+  }
+}
+
+function updateLegend() {
+  const i = hoverIdx != null ? hoverIdx : viewI[1], t = curT[i];
+  if (t == null) return;
+  let h = '';
+  if (state.compare) {
+    h = `<span class="lg when">${fmtDate(t)} · change since ${fmtDate(curT[viewI[0]])}</span>` + KEYS.map(c => {
+      const v = seriesMap[c].v;
+      return `<span class="lg"><i class="dot" style="--c:var(--${c})"></i>${CUR[c].code} <b>${fmt(c, v[i])}</b> <span class="sub">${pct(v[i] / v[viewI[0]] - 1)}</span></span>`;
+    }).join('');
+  } else {
+    const c = state.cur;
+    h = `<span class="lg"><i class="dot" style="--c:var(--${c})"></i>${CUR[c].code} <b>${fmt(c, curV[i])}</b> <span class="sub">${unitLabel()}</span></span>
+      <span class="lg when">${fmtDate(t)}</span>`;
+    if (ma[50]) h += `<span class="lg"><i class="dash"></i><span class="sub">MA 50</span> ${fmt(c, ma[50][i])}</span>`;
+    if (ma[200]) h += `<span class="lg"><i class="dash solid"></i><span class="sub">MA 200</span> ${fmt(c, ma[200][i])}</span>`;
+  }
+  $('#legend').innerHTML = h;
+}
+
+chart.subscribeCrosshairMove(p => {
+  let idx = null;
+  if (p && p.time != null && p.point) { const i = lowerBound(curT, p.time); if (curT[i] === p.time) idx = i; }
+  if (idx !== hoverIdx) { hoverIdx = idx; updateLegend(); }
+});
+
+/* ---------- measure ---------- */
+/* Own click handling: the chart library drops a second click that follows the first within half a second. */
+let downAt = null;
+chartEl.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+chartEl.addEventListener('click', e => {
+  if (!state.measure || state.compare) return;
+  if (downAt && Math.abs(e.clientX - downAt[0]) + Math.abs(e.clientY - downAt[1]) > 8) return;
+  const x = e.clientX - chartEl.getBoundingClientRect().left, ts = chart.timeScale();
+  if (x > ts.width()) return;
+  const logical = ts.coordinateToLogical(x);
+  if (logical == null) return;
+  const i = Math.max(0, Math.min(curT.length - 1, Math.round(logical)));
+  if (measurePts.length >= 2) measurePts = [];
+  measurePts.push(i);
+  renderMeasure();
+});
+function renderMeasure() {
+  $('#measurePanel').hidden = !state.measure || state.compare;
+  if (!main) return;
+  const pts = measurePts.slice().sort((a, b) => a - b), ink = cssv('--ink');
+  main.setMarkers(pts.map((i, n) => ({ time: curT[i], position: 'aboveBar', shape: 'circle', color: ink, text: n === 0 ? 'A' : 'B' })));
+  const c = state.cur, body = $('#measureBody');
+  if (!pts.length) { body.innerHTML = '<p class="hint">Tap a start point on the chart, then an end point.</p>'; return; }
+  if (pts.length === 1) { body.innerHTML = `<p class="hint">A: ${fmtDate(curT[pts[0]])} at <strong>${fmt(c, curV[pts[0]])}</strong>. Now tap an end point.</p>`; return; }
+  const [a, b2] = pts, va = curV[a], vb = curV[b2], yrs = (curT[b2] - curT[a]) / YEAR;
+  body.innerHTML = `<dl class="kv">
+    <dt>A</dt><dd>${fmt(c, va)}<small>${fmtDate(curT[a])}</small></dd>
+    <dt>B</dt><dd>${fmt(c, vb)}<small>${fmtDate(curT[b2])}</small></dd>
+    <dt>Change</dt><dd>${arrowPct(vb / va - 1)}<small>${vb >= va ? '+' : '−'}${fmt(c, Math.abs(vb - va))} over ${span(curT[a], curT[b2])}</small></dd>
+    <dt>Growth a year</dt><dd>${yrs >= 1 ? pct(Math.pow(vb / va, 1 / yrs) - 1, 1) : '–'}</dd>
+  </dl>`;
+}
+
+/* ---------- tiles, records, calculator ---------- */
+function priceAt(c, t) {
+  if (t >= dailyStart) { const D = base.D; let i = lowerBound(D.t, t + 1) - 1; if (i < 0) i = 0; return { v: D[c][i], t: D.t[i] }; }
+  const M = base.M; let i = Math.max(0, lowerBound(M.t, t + 1 + 16 * 86400) - 1);
+  while (i < M.t.length && M[c][i] == null) i++;
+  return { v: M[c][i], t: M.t[i] };
+}
+function renderTiles() {
+  const D = base.D, n = D.t.length - 1, k = mult();
+  $('#tiles').innerHTML = KEYS.map(c => {
+    const last = D[c][n], prev = D[c][n - 1], yearAgo = priceAt(c, D.t[n] - YEAR).v, px = fmt(c, last * k);
+    return `<button class="tile" type="button" data-cur="${c}" aria-pressed="${state.cur === c}" style="--c:var(--${c})">
+      <div class="who"><i class="dot"></i>${CUR[c].code}<span>${CUR[c].name}</span></div>
+      <div class="px${px.length > 10 ? ' long' : ''}">${px}</div>
+      <div class="chg"><span>${arrowPct(last / prev - 1, 2)} day</span><span>${arrowPct(last / yearAgo - 1, 1)} year</span></div>
+    </button>`;
+  }).join('');
+  $('#updated').textContent = `${unitLabel()} · prices to ${dFull.format(D.t[n] * 1000)}`;
+}
+function renderRecords() {
+  const c = state.cur, D = base.D, k = mult(), n = D.t.length - 1;
+  let hi = 0;
+  for (let i = 1; i <= n; i++) if (D[c][i] > D[c][hi]) hi = i;
+  const tenAgo = priceAt(c, D.t[n] - 10 * YEAR).v, twentyAgo = priceAt(c, D.t[n] - 20 * YEAR).v;
+  $('#recordBody').innerHTML = `<dl class="kv">
+    <dt>All-time high</dt><dd>${fmt(c, D[c][hi] * k)}<small>${dFull.format(D.t[hi] * 1000)}</small></dd>
+    <dt>Now vs high</dt><dd>${hi === n ? 'At the high' : pct(D[c][n] / D[c][hi] - 1, 1)}</dd>
+    <dt>10 years</dt><dd>${arrowPct(D[c][n] / tenAgo - 1, 0)}<small>${pct(Math.pow(D[c][n] / tenAgo, 0.1) - 1, 1)} a year</small></dd>
+    <dt>20 years</dt><dd>${arrowPct(D[c][n] / twentyAgo - 1, 0)}<small>${pct(Math.pow(D[c][n] / twentyAgo, 0.05) - 1, 1)} a year</small></dd>
+  </dl>`;
+}
+function renderCalc() {
+  const w = parseFloat($('#cWeight').value), D = base.D, n = D.t.length - 1;
+  const grams = (isFinite(w) && w > 0 ? w : 0) * UNITS[$('#cUnit').value].grams * PURITY[$('#cPurity').value].f;
+  const dv = $('#cDate').value, t0 = dv ? Date.parse(dv + 'T00:00:00Z') / 1000 : null;
+  $('#calcOut').innerHTML = KEYS.map(c => {
+    const now = D[c][n] * grams;
+    let sub = '';
+    if (t0 != null && isFinite(t0) && t0 < D.t[n] && grams > 0) {
+      const then = priceAt(c, t0);
+      if (then.v != null) {
+        const yrs = (D.t[n] - then.t) / YEAR, r = D[c][n] / then.v;
+        sub = `<span class="sub">${fmt(c, then.v * grams)} on ${fmtDate(then.t)} · ${pct(r - 1)}${yrs >= 1 ? ' · ' + pct(Math.pow(r, 1 / yrs) - 1, 1) + ' a year' : ''}</span>`;
+      } else sub = `<span class="sub">No ${CUR[c].code} price that far back</span>`;
+    }
+    return `<div class="row"><span class="nm"><i class="dot" style="--c:var(--${c})"></i>${CUR[c].code}</span><span class="val">${fmt(c, now)}</span>${sub}</div>`;
+  }).join('');
+}
+
+/* ---------- yearly table ---------- */
+function renderTable() {
+  const c = state.cur, k = mult(), years = new Map();
+  const add = (t, v) => {
+    if (v == null) return;
+    const d = new Date(t * 1000), y = d.getUTCFullYear(), m = d.getUTCMonth();
+    let o = years.get(y);
+    if (!o) { o = { hi: -Infinity, lo: Infinity, last: v, months: {} }; years.set(y, o); }
+    if (v > o.hi) o.hi = v; if (v < o.lo) o.lo = v; o.last = v;
+    (o.months[m] = o.months[m] || []).push(v);
+  };
+  const M = base.M, D = base.D;
+  for (let i = 0; i < M.t.length && M.t[i] < dailyStart; i++) add(M.t[i], M[c][i]);
+  for (let i = 0; i < D.t.length; i++) add(D.t[i], D[c][i]);
+  const ys = [...years.keys()].sort((a, b) => a - b), thisYear = new Date(D.t[D.t.length - 1] * 1000).getUTCFullYear();
+  let rows = '';
+  for (let j = ys.length - 1; j >= 0; j--) {
+    const y = ys[j], o = years.get(y), prev = j > 0 ? years.get(ys[j - 1]).last : null;
+    const mm = Object.values(o.months).map(a => a.reduce((s, v) => s + v, 0) / a.length), avg = mm.reduce((s, v) => s + v, 0) / mm.length;
+    rows += `<tr><td>${y}${y === thisYear ? ' <span class="note">so far</span>' : ''}</td><td>${fmt(c, avg * k)}</td><td>${fmt(c, o.hi * k)}</td><td>${fmt(c, o.lo * k)}</td><td>${fmt(c, o.last * k)}</td><td>${prev ? arrowPct(o.last / prev - 1, 1) : '–'}</td></tr>`;
+  }
+  $('#tableWrap').innerHTML = `<table><thead><tr><th>Year</th><th>Average</th><th>High</th><th>Low</th><th>Year end</th><th>Change</th></tr></thead><tbody>${rows}</tbody>
+    <tfoot><tr><td class="note" colspan="6">${CUR[c].code} ${unitLabel()}. Years before 2001 use monthly averages, so highs and lows are smoother than daily prices.</td></tr></tfoot></table>`;
+}
+
+/* ---------- controls ---------- */
+function syncControls() {
+  document.querySelectorAll('#ranges button').forEach(b => b.setAttribute('aria-pressed', b.dataset.range === state.range));
+  document.querySelectorAll('#intervals button').forEach(b => b.setAttribute('aria-pressed', b.dataset.iv === state.interval));
+  document.querySelectorAll('#views button').forEach(b => b.setAttribute('aria-pressed', b.dataset.view === state.view));
+  document.querySelectorAll('#tiles .tile').forEach(b => b.setAttribute('aria-pressed', b.dataset.cur === state.cur));
+  const press = (id, on) => $(id).setAttribute('aria-pressed', !!on);
+  press('#tCompare', state.compare); press('#tLog', state.log); press('#tMa50', state.ma50); press('#tMa200', state.ma200);
+  press('#tHiLo', state.hilo); press('#tMeasure', state.measure);
+  for (const id of ['#tLog', '#tMa50', '#tMa200', '#tHiLo', '#tMeasure']) $(id).disabled = state.compare;
+  $('#themeBtn').textContent = state.theme === 'dark' ? 'Light' : 'Dark';
+  $('#unit').value = state.unit; $('#purity').value = state.purity;
+}
+function refreshAll() { renderTiles(); renderRecords(); renderCalc(); if (state.view === 'table') renderTable(); render(); }
+
+$('#ranges').innerHTML = Object.keys(RANGES).map(k => `<button type="button" data-range="${k}">${k}</button>`).join('');
+$('#ranges').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.range = b.dataset.range;
+  const [f, t] = presetRange(state.range);
+  state.interval = autoInterval(f, t);
+  render();
+});
+$('#intervals').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.interval = b.dataset.iv; render();
+});
+$('#views').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.view = b.dataset.view;
+  const table = state.view === 'table';
+  $('#tableWrap').hidden = !table; $('#chart').hidden = table; $('#legend').hidden = table; $('#tools').hidden = table;
+  if (table) renderTable();
+  syncControls();
+});
+$('#tiles').addEventListener('click', e => {
+  const b = e.target.closest('.tile'); if (!b) return;
+  state.cur = b.dataset.cur; save();
+  renderRecords(); if (state.view === 'table') renderTable(); render();
+});
+function dateChange() {
+  const f = Date.parse($('#dFrom').value + 'T00:00:00Z') / 1000, t = Date.parse($('#dTo').value + 'T00:00:00Z') / 1000;
+  if (!isFinite(f) || !isFinite(t) || t <= f) return;
+  state.range = null; state.viewFrom = f; state.viewTo = t; state.interval = autoInterval(f, t);
+  render();
+}
+$('#dFrom').addEventListener('change', dateChange);
+$('#dTo').addEventListener('change', dateChange);
+const toggle = (id, key, after) => $(id).addEventListener('click', () => { state[key] = !state[key]; if (after) after(); render(); });
+toggle('#tCompare', 'compare', () => { if (state.compare) state.measure = false; });
+toggle('#tLog', 'log'); toggle('#tMa50', 'ma50'); toggle('#tMa200', 'ma200'); toggle('#tHiLo', 'hilo');
+$('#tMeasure').addEventListener('click', () => { state.measure = !state.measure; measurePts = []; renderMeasure(); syncControls(); });
+$('#unit').addEventListener('change', e => { state.unit = e.target.value; save(); refreshAll(); });
+$('#purity').addEventListener('change', e => { state.purity = e.target.value; save(); refreshAll(); });
+$('#themeBtn').addEventListener('click', () => {
+  state.theme = state.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = state.theme; save(); themeChart(); render();
+});
+for (const id of ['#cWeight', '#cUnit', '#cPurity', '#cDate']) $(id).addEventListener('input', renderCalc);
+
+function download(name, blob) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+$('#bCsv').addEventListener('click', () => {
+  const b = base[state.interval], k = mult(), u = state.unit + '_' + PURITY[state.purity].label;
+  let csv = `date,usd_per_${u},inr_per_${u},sgd_per_${u}\n`;
+  for (let i = 0; i < b.t.length; i++) csv += iso(b.t[i]) + ',' + KEYS.map(c => b[c][i] == null ? '' : (b[c][i] * k).toFixed(c === 'inr' ? 2 : 4)).join(',') + '\n';
+  download(`gold-price-${state.interval === 'D' ? 'daily' : state.interval === 'W' ? 'weekly' : 'monthly'}.csv`, new Blob([csv], { type: 'text/csv' }));
+});
+$('#bPng').addEventListener('click', () => chart.takeScreenshot().toBlob(b => b && download(`gold-${state.compare ? 'compare' : state.cur}-${iso(state.viewTo)}.png`, b)));
+function setMax(on) { $('#chartCard').classList.toggle('is-max', on); $('#bMax').setAttribute('aria-pressed', on); $('#bMax').textContent = on ? 'Close' : 'Expand'; }
+$('#bMax').addEventListener('click', () => setMax(!$('#chartCard').classList.contains('is-max')));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') setMax(false); });
+
+/* ---------- live refresh ---------- */
+async function liveCheck() {
+  try {
+    const r = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/xau.json', { cache: 'no-store' });
+    const j = await r.json(), day = Math.round(Date.parse(j.date + 'T00:00:00Z') / 86400000), dow = (day + 4) % 7, d = raw.daily;
+    if (dow === 0 || dow === 6 || day <= d.t[d.t.length - 1] || !(j.xau && j.xau.usd && j.xau.inr && j.xau.sgd)) return;
+    d.t.push(day); d.usd.push(j.xau.usd / OZ); d.inr.push(j.xau.inr / OZ); d.sgd.push(j.xau.sgd / OZ);
+    ingest(); refreshAll();
+  } catch (e) {}
+}
+function reloadData() {
+  const s = document.createElement('script');
+  s.src = 'data.js?t=' + Date.now();
+  s.onload = () => {
+    s.remove();
+    if (window.GOLD_DATA && window.GOLD_DATA.updated !== raw.updated) { raw = window.GOLD_DATA; ingest(); refreshAll(); }
+    liveCheck();
+  };
+  s.onerror = () => s.remove();
+  document.head.appendChild(s);
+}
+
+/* ---------- start ---------- */
+document.documentElement.dataset.theme = state.theme;
+ingest();
+$('#dFrom').min = $('#dTo').min = $('#cDate').min = iso(base.M.t[0]);
+$('#dFrom').max = $('#dTo').max = $('#cDate').max = iso(base.D.t[base.D.t.length - 1]);
+themeChart();
+refreshAll();
+liveCheck();
+setInterval(reloadData, 15 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
